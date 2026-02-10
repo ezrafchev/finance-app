@@ -26,19 +26,13 @@ export default function Home() {
           </div>
           <div className="flex gap-4">
             <Button variant="ghost" asChild>
-              <Link href="/dashboard">Dashboard</Link>
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link href="/dashboard#transacoes">Transações</Link>
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link href="/dashboard#ferramentas">Ferramentas</Link>
-            </Button>
-            <Button variant="ghost" asChild>
               <Link href="/privacy">Privacidade</Link>
             </Button>
+            <Button variant="ghost" asChild>
+              <Link href="/login">Entrar</Link>
+            </Button>
             <Button asChild>
-              <Link href="/dashboard">Começar agora</Link>
+              <Link href="/login?mode=register">Criar conta</Link>
             </Button>
           </div>
         </div>
@@ -55,7 +49,7 @@ export default function Home() {
           </p>
           <div className="flex gap-4 justify-center">
             <Button size="lg" className="gap-2" asChild>
-              <Link href="/dashboard">
+              <Link href="/login">
                 Acessar painel completo <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </Button>
@@ -172,10 +166,10 @@ export default function Home() {
           </CardDescription>
           <div className="flex gap-4 justify-center">
             <Button size="lg" variant="secondary" asChild>
-              <Link href="/dashboard">Criar cadastro</Link>
+              <Link href="/login?mode=register">Criar cadastro</Link>
             </Button>
             <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/10" asChild>
-              <Link href="/dashboard#assistente">Conhecer a IA</Link>
+              <Link href="/login">Conhecer a IA</Link>
             </Button>
           </div>
         </CardHeader>

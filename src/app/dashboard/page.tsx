@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   Calculator,
@@ -48,6 +49,7 @@ type Transaction = {
 const STORAGE_KEYS = {
   profile: "finance-app-profile",
   transactions: "finance-app-transactions",
+  session: "finance-app-session",
 };
 
 const MAX_PROJECTION_MONTHS = 24;
@@ -99,6 +101,8 @@ const calculateCompoundBalance = (monthlyContribution: number, monthlyRate: numb
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [profile, setProfile] = useState<Profile>(defaultProfile);
   const [profileSavedAt, setProfileSavedAt] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -124,6 +128,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const session = window.localStorage.getItem(STORAGE_KEYS.session);
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+    setIsAuthenticated(true);
+
     const storedProfile = window.localStorage.getItem(STORAGE_KEYS.profile);
     if (storedProfile) {
       const parsed = JSON.parse(storedProfile) as Profile & { savedAt?: string };
@@ -138,7 +149,7 @@ export default function DashboardPage() {
       const parsed = JSON.parse(storedTransactions) as Transaction[];
       setTransactions(parsed);
     }
-  }, []);
+  }, [router]);
 
   const monthlyIncome = parseNumber(profile.monthlyIncome);
   const fixedExpenses = parseNumber(profile.fixedExpenses);
@@ -328,6 +339,10 @@ export default function DashboardPage() {
     setAssistantTips(tips);
   };
 
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <header className="border-b bg-white/60 backdrop-blur-sm">
@@ -342,6 +357,9 @@ export default function DashboardPage() {
             </Button>
             <Button variant="outline" asChild>
               <Link href="/">Voltar ao início</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/logout">Sair</Link>
             </Button>
           </div>
         </div>
