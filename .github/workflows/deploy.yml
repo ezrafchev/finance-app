@@ -18,14 +18,18 @@ concurrency:
 jobs:
   check-pages-enabled:
     runs-on: ubuntu-latest
+    outputs:
+      pages-enabled: ${{ steps.check-pages.outputs.pages-enabled }}
     steps:
       - name: Check GitHub Pages Configuration
+        id: check-pages
         uses: actions/github-script@v7
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             let pages;
+            core.setOutput('pages-enabled', 'false');
 
             try {
               pages = await github.rest.repos.getPages({ owner, repo });
@@ -40,6 +44,14 @@ jobs:
                   });
                   pages = await github.rest.repos.getPages({ owner, repo });
                 } catch (createError) {
+                  if (createError.status === 403 && createError.message?.includes('Resource not accessible by integration')) {
+                    core.warning('⚠️ GitHub Pages could not be auto-enabled with the workflow token. Manual setup is required.');
+                    console.log('\n📖 To enable:');
+                    console.log('1. Go to: https://github.com/' + owner + '/' + repo + '/settings/pages');
+                    console.log('2. Source: GitHub Actions');
+                    console.log('3. See GITHUB_PAGES_SETUP.md for instructions');
+                    return;
+                  }
                   core.setFailed('❌ GitHub Pages is NOT enabled and automatic setup failed: ' + createError.message);
                   console.log('\n📖 To enable:');
                   console.log('1. Go to: https://github.com/' + owner + '/' + repo + '/settings/pages');
@@ -59,11 +71,14 @@ jobs:
               core.setFailed('⚠️ GitHub Pages source must be set to "GitHub Actions"');
               console.log('\n📖 Fix: Go to Settings → Pages → Source: GitHub Actions');
               console.log('🔗 https://github.com/' + owner + '/' + repo + '/settings/pages');
+            } else {
+              core.setOutput('pages-enabled', 'true');
             }
   
   build:
     runs-on: ubuntu-latest
     needs: check-pages-enabled
+    if: needs.check-pages-enabled.outputs.pages-enabled == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,7 +107,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, check-pages-enabled]
+    if: needs.check-pages-enabled.outputs.pages-enabled == 'true'
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
