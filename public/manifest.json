@@ -1,0 +1,16 @@
+{
+  "name": "Finance App",
+  "short_name": "FinanceApp",
+  "description": "A modern finance application to help you track and manage your personal finances",
+  "start_url": "/finance-app/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/finance-app/file.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

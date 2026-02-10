@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: "A modern finance application to help you track and manage your personal finances. Track expenses, manage budgets, and achieve your financial goals.",
   keywords: ["finance", "budget", "expense tracker", "money management", "financial planning"],
   authors: [{ name: "Finance App Team" }],
+  manifest: "/manifest.json",
   openGraph: {
     title: "Finance App - Manage Your Finances",
     description: "Track expenses, manage budgets, and achieve your financial goals",
