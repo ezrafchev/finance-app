@@ -23,30 +23,42 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            let pages;
+
             try {
-              const pages = await github.rest.repos.getPages({
-                owner: context.repo.owner,
-                repo: context.repo.repo
-              });
-              
-              console.log('✅ GitHub Pages is enabled');
-              console.log(`📍 Build type: ${pages.data.build_type || pages.data.source?.type}`);
-              
-              if (pages.data.build_type !== 'workflow' && pages.data.source?.type !== 'workflow') {
-                core.setFailed('⚠️ GitHub Pages source must be set to "GitHub Actions"');
-                console.log('\n📖 Fix: Go to Settings → Pages → Source: GitHub Actions');
-                console.log('🔗 https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/settings/pages');
-              }
+              pages = await github.rest.repos.getPages({ owner, repo });
             } catch (error) {
               if (error.status === 404) {
-                core.setFailed('❌ GitHub Pages is NOT enabled!');
-                console.log('\n📖 To enable:');
-                console.log('1. Go to: https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/settings/pages');
-                console.log('2. Source: GitHub Actions');
-                console.log('3. See GITHUB_PAGES_SETUP.md for instructions');
+                console.log('ℹ️ GitHub Pages is not enabled. Attempting to enable via API...');
+                try {
+                  await github.rest.repos.createPagesSite({
+                    owner,
+                    repo,
+                    build_type: 'workflow'
+                  });
+                  pages = await github.rest.repos.getPages({ owner, repo });
+                } catch (createError) {
+                  core.setFailed('❌ GitHub Pages is NOT enabled and automatic setup failed: ' + createError.message);
+                  console.log('\n📖 To enable:');
+                  console.log('1. Go to: https://github.com/' + owner + '/' + repo + '/settings/pages');
+                  console.log('2. Source: GitHub Actions');
+                  console.log('3. See GITHUB_PAGES_SETUP.md for instructions');
+                  return;
+                }
               } else {
                 throw error;
               }
+            }
+
+            console.log('✅ GitHub Pages is enabled');
+            console.log(`📍 Build type: ${pages.data.build_type || pages.data.source?.type}`);
+
+            if (pages.data.build_type !== 'workflow' && pages.data.source?.type !== 'workflow') {
+              core.setFailed('⚠️ GitHub Pages source must be set to "GitHub Actions"');
+              console.log('\n📖 Fix: Go to Settings → Pages → Source: GitHub Actions');
+              console.log('🔗 https://github.com/' + owner + '/' + repo + '/settings/pages');
             }
   
   build:
