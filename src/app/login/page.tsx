@@ -15,7 +15,7 @@ const SESSION_STORAGE_KEY = "finance-app-session";
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 const PBKDF2_ITERATIONS = 120000;
 const PBKDF2_HASH = "SHA-256";
-const EMAIL_PATTERN = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type StoredUser = {
   name: string;
