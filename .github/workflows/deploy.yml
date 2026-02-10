@@ -52,7 +52,6 @@ jobs:
                     console.log('3. See GITHUB_PAGES_SETUP.md for instructions');
                     return;
                   }
-                  core.setOutput('pages-enabled', 'false');
                   core.setFailed('❌ GitHub Pages is NOT enabled and automatic setup failed: ' + createError.message);
                   console.log('\n📖 To enable:');
                   console.log('1. Go to: https://github.com/' + owner + '/' + repo + '/settings/pages');
@@ -66,14 +65,15 @@ jobs:
             }
 
             console.log('✅ GitHub Pages is enabled');
-            console.log(`📍 Build type: ${pages.data.build_type || pages.data.source?.type}`);
+            const buildType = pages.data.build_type || pages.data.source?.type;
+            const pagesEnabled = buildType === 'workflow';
+            core.setOutput('pages-enabled', String(pagesEnabled));
+            console.log(`📍 Build type: ${buildType}`);
 
-            if (pages.data.build_type !== 'workflow' && pages.data.source?.type !== 'workflow') {
+            if (!pagesEnabled) {
               core.setFailed('⚠️ GitHub Pages source must be set to "GitHub Actions"');
               console.log('\n📖 Fix: Go to Settings → Pages → Source: GitHub Actions');
               console.log('🔗 https://github.com/' + owner + '/' + repo + '/settings/pages');
-            } else {
-              core.setOutput('pages-enabled', 'true');
             }
   
   build:
