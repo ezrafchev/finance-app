@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -24,7 +25,9 @@ export default function Home() {
             <h1 className="text-xl font-bold">Finance App</h1>
           </div>
           <div className="flex gap-4">
-            <Button variant="ghost">Dashboard</Button>
+            <Button variant="ghost" asChild>
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
             <Button variant="ghost">Transactions</Button>
             <Button variant="ghost">Reports</Button>
             <Button>Get Started</Button>
