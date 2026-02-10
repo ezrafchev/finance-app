@@ -39,7 +39,7 @@ jobs:
                   });
                   pages = await github.rest.repos.getPages({ owner, repo });
                 } catch (createError) {
-                  if (createError.status === 403 && createError.message?.includes('Resource not accessible by integration')) {
+                  if (createError.status === 403) {
                     core.warning('⚠️ GitHub Pages could not be auto-enabled with the workflow token. Manual setup is required.');
                     console.log('');
                     console.log('📖 To enable GitHub Pages:');
