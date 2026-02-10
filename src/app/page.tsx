@@ -28,9 +28,18 @@ export default function Home() {
             <Button variant="ghost" asChild>
               <Link href="/dashboard">Dashboard</Link>
             </Button>
-            <Button variant="ghost">Transactions</Button>
-            <Button variant="ghost">Reports</Button>
-            <Button>Get Started</Button>
+            <Button variant="ghost" asChild>
+              <Link href="/dashboard#transacoes">Transações</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link href="/dashboard#ferramentas">Ferramentas</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link href="/privacy">Privacidade</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard">Começar agora</Link>
+            </Button>
           </div>
         </div>
       </nav>
@@ -39,17 +48,19 @@ export default function Home() {
       <section className="container mx-auto px-4 py-16">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-            Take Control of Your Finances
+            Controle total das suas finanças
           </h2>
           <p className="text-xl text-muted-foreground mb-8">
-            Track expenses, manage budgets, and achieve your financial goals with our modern finance management platform
+            Cadastros funcionais, banco de dados local, ferramentas avançadas e uma IA gratuita especialista em finanças.
           </p>
           <div className="flex gap-4 justify-center">
-            <Button size="lg" className="gap-2">
-              Start Free Trial <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            <Button size="lg" className="gap-2" asChild>
+              <Link href="/dashboard">
+                Acessar painel completo <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </Button>
-            <Button size="lg" variant="outline">
-              View Demo
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/privacy">Política de privacidade</Link>
             </Button>
           </div>
         </div>
@@ -120,61 +131,64 @@ export default function Home() {
               <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <PieChart className="h-6 w-6 text-primary" aria-hidden="true" />
               </div>
-              <CardTitle>Budget Tracking</CardTitle>
-              <CardDescription>
-                Set budgets for different categories and track your spending in real-time
-              </CardDescription>
-            </CardHeader>
-          </Card>
+            <CardTitle>Cadastro & banco local</CardTitle>
+            <CardDescription>
+              Salve seus dados no navegador e mantenha histórico completo de transações.
+            </CardDescription>
+          </CardHeader>
+        </Card>
 
           <Card className="text-center hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <BarChart3 className="h-6 w-6 text-primary" aria-hidden="true" />
               </div>
-              <CardTitle>Financial Reports</CardTitle>
-              <CardDescription>
-                Generate detailed reports and visualize your financial data with charts
-              </CardDescription>
-            </CardHeader>
-          </Card>
+            <CardTitle>Ferramentas avançadas</CardTitle>
+            <CardDescription>
+              Planejador 50/30/20, simulador de investimentos e metas de reserva.
+            </CardDescription>
+          </CardHeader>
+        </Card>
 
           <Card className="text-center hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <Wallet className="h-6 w-6 text-primary" aria-hidden="true" />
               </div>
-              <CardTitle>Smart Insights</CardTitle>
-              <CardDescription>
-                Get personalized insights and recommendations to improve your financial health
-              </CardDescription>
-            </CardHeader>
-          </Card>
+            <CardTitle>IA financeira gratuita</CardTitle>
+            <CardDescription>
+              Recomendações automáticas para investir melhor e equilibrar o orçamento.
+            </CardDescription>
+          </CardHeader>
+        </Card>
         </div>
 
         {/* CTA Section */}
         <Card className="bg-gradient-to-r from-primary to-blue-600 text-white">
           <CardHeader className="text-center py-12">
-            <CardTitle className="text-3xl mb-4">Ready to Get Started?</CardTitle>
-            <CardDescription className="text-white/90 text-lg mb-6">
-              Join thousands of users who are already managing their finances smarter
-            </CardDescription>
-            <div className="flex gap-4 justify-center">
-              <Button size="lg" variant="secondary">
-                Create Free Account
-              </Button>
-              <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/10">
-                Learn More
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+          <CardTitle className="text-3xl mb-4">Tudo pronto para começar?</CardTitle>
+          <CardDescription className="text-white/90 text-lg mb-6">
+            Tenha todas as funções essenciais em um único painel funcional.
+          </CardDescription>
+          <div className="flex gap-4 justify-center">
+            <Button size="lg" variant="secondary" asChild>
+              <Link href="/dashboard">Criar cadastro</Link>
+            </Button>
+            <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/10" asChild>
+              <Link href="/dashboard#assistente">Conhecer a IA</Link>
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
       </section>
 
       {/* Footer */}
       <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
         <div className="container mx-auto px-4 py-8 text-center text-muted-foreground">
-          <p>© {new Date().getFullYear()} Finance App. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Finance App. Todos os direitos reservados.</p>
+          <p className="mt-2">
+            <Link href="/privacy" className="underline underline-offset-4">Política de privacidade</Link>
+          </p>
         </div>
       </footer>
     </div>
