@@ -65,7 +65,37 @@ jobs:
             }
 
             console.log('✅ GitHub Pages is enabled');
-            const buildType = pages.data.build_type || pages.data.source?.type;
+            let buildType = pages.data.build_type || pages.data.source?.type;
+
+            if (buildType !== 'workflow') {
+              console.log('ℹ️ GitHub Pages is set to legacy builds. Switching to GitHub Actions...');
+              try {
+                await github.request('PUT /repos/{owner}/{repo}/pages', {
+                  owner,
+                  repo,
+                  build_type: 'workflow'
+                });
+                pages = await github.rest.repos.getPages({ owner, repo });
+                buildType = pages.data.build_type || pages.data.source?.type;
+              } catch (updateError) {
+                if (updateError.status === 403) {
+                  core.setOutput('pages-enabled', 'false');
+                  core.warning('⚠️ GitHub Pages could not be updated to GitHub Actions with the workflow token. Manual setup is required.');
+                  console.log('\n📖 To enable:');
+                  console.log('1. Go to: https://github.com/' + owner + '/' + repo + '/settings/pages');
+                  console.log('2. Source: GitHub Actions');
+                  console.log('3. See GITHUB_PAGES_SETUP.md for instructions');
+                  return;
+                }
+                core.setFailed('❌ GitHub Pages is NOT set to GitHub Actions and automatic setup failed: ' + updateError.message);
+                console.log('\n📖 To enable:');
+                console.log('1. Go to: https://github.com/' + owner + '/' + repo + '/settings/pages');
+                console.log('2. Source: GitHub Actions');
+                console.log('3. See GITHUB_PAGES_SETUP.md for instructions');
+                return;
+              }
+            }
+
             const pagesEnabled = buildType === 'workflow';
             core.setOutput('pages-enabled', String(pagesEnabled));
             console.log(`📍 Build type: ${buildType}`);
