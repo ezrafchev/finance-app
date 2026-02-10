@@ -50,11 +50,13 @@ const STORAGE_KEYS = {
   profile: "finance-app-profile",
   transactions: "finance-app-transactions",
   session: "finance-app-session",
+  user: "finance-app-user",
 };
 
 const MAX_PROJECTION_MONTHS = 24;
 const MIN_PROJECTION_MONTHS = 1;
 const DEFAULT_PROJECTION_MONTHS = 12;
+const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -100,6 +102,27 @@ const calculateCompoundBalance = (monthlyContribution: number, monthlyRate: numb
   return monthlyContribution * ((Math.pow(1 + monthlyRate, month) - 1) / monthlyRate);
 };
 
+const getValidSession = () => {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(STORAGE_KEYS.session);
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as { email?: string; signedInAt?: string };
+    if (!parsed.email || !parsed.signedInAt) return null;
+    const signedInAt = new Date(parsed.signedInAt).getTime();
+    if (!Number.isFinite(signedInAt) || Date.now() - signedInAt > SESSION_MAX_AGE_MS) {
+      return null;
+    }
+    const storedUser = window.localStorage.getItem(STORAGE_KEYS.user);
+    if (!storedUser) return null;
+    const user = JSON.parse(storedUser) as { email?: string };
+    if (!user.email || user.email !== parsed.email) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -128,8 +151,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const session = window.localStorage.getItem(STORAGE_KEYS.session);
+    const session = getValidSession();
     if (!session) {
+      window.localStorage.removeItem(STORAGE_KEYS.session);
       router.replace("/login");
       return;
     }

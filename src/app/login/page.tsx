@@ -12,12 +12,19 @@ import { Label } from "@/components/ui/label";
 
 const USER_STORAGE_KEY = "finance-app-user";
 const SESSION_STORAGE_KEY = "finance-app-session";
+const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 
 type StoredUser = {
   name: string;
   email: string;
+  salt: string;
   passwordHash: string;
   createdAt: string;
+};
+
+type StoredSession = {
+  email: string;
+  signedInAt: string;
 };
 
 type StatusMessage = {
@@ -25,11 +32,24 @@ type StatusMessage = {
   text: string;
 };
 
-const hashPassword = async (value: string) => {
+const ensureCrypto = () => {
   if (typeof window === "undefined" || !window.crypto?.subtle) {
-    return value;
+    throw new Error("Seu navegador não suporta criptografia necessária para login seguro.");
   }
-  const data = new TextEncoder().encode(value);
+};
+
+const createSalt = () => {
+  ensureCrypto();
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+const hashPassword = async (value: string, salt: string) => {
+  ensureCrypto();
+  const data = new TextEncoder().encode(`${salt}:${value}`);
   const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(hashBuffer))
     .map((byte) => byte.toString(16).padStart(2, "0"))
@@ -41,10 +61,36 @@ const getStoredUser = () => {
   const stored = window.localStorage.getItem(USER_STORAGE_KEY);
   if (!stored) return null;
   try {
-    return JSON.parse(stored) as StoredUser;
+    const parsed = JSON.parse(stored) as StoredUser;
+    if (!parsed.email || !parsed.passwordHash || !parsed.salt) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
+};
+
+const getStoredSession = () => {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as StoredSession;
+    if (!parsed.email || !parsed.signedInAt) return null;
+    const signedInAt = new Date(parsed.signedInAt).getTime();
+    if (!Number.isFinite(signedInAt) || Date.now() - signedInAt > SESSION_MAX_AGE_MS) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const clearSession = () => {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
 };
 
 function LoginContent() {
@@ -63,10 +109,12 @@ function LoginContent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const session = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    const session = getStoredSession();
     if (session) {
       router.replace("/dashboard");
+      return;
     }
+    clearSession();
   }, [router]);
 
   useEffect(() => {
@@ -100,7 +148,7 @@ function LoginContent() {
       }
 
       const email = loginForm.email.trim().toLowerCase();
-      const passwordHash = await hashPassword(loginForm.password);
+      const passwordHash = await hashPassword(loginForm.password, storedUser.salt);
 
       if (storedUser.email !== email || storedUser.passwordHash !== passwordHash) {
         setStatus({ type: "error", text: "E-mail ou senha incorretos." });
@@ -112,6 +160,11 @@ function LoginContent() {
         JSON.stringify({ email: storedUser.email, signedInAt: new Date().toISOString() })
       );
       router.replace("/dashboard");
+    } catch (error) {
+      setStatus({
+        type: "error",
+        text: error instanceof Error ? error.message : "Não foi possível validar seus dados no momento.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -143,7 +196,7 @@ function LoginContent() {
       }
 
       const existing = getStoredUser();
-      if (existing && existing.email !== email) {
+      if (existing) {
         setStatus({
           type: "error",
           text: "Já existe um cadastro neste navegador. Faça login com ele.",
@@ -152,10 +205,12 @@ function LoginContent() {
         return;
       }
 
-      const passwordHash = await hashPassword(password);
+      const salt = createSalt();
+      const passwordHash = await hashPassword(password, salt);
       const newUser: StoredUser = {
         name,
         email,
+        salt,
         passwordHash,
         createdAt: new Date().toISOString(),
       };
@@ -166,6 +221,11 @@ function LoginContent() {
         JSON.stringify({ email: newUser.email, signedInAt: new Date().toISOString() })
       );
       router.replace("/dashboard");
+    } catch (error) {
+      setStatus({
+        type: "error",
+        text: error instanceof Error ? error.message : "Não foi possível criar sua conta no momento.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -223,7 +283,7 @@ function LoginContent() {
                     type="email"
                     value={loginForm.email}
                     onChange={(event) => setLoginForm((prev) => ({ ...prev, email: event.target.value }))}
-                    placeholder="voce@exemplo.com"
+                    placeholder="você@exemplo.com"
                     required
                   />
                 </div>
@@ -260,7 +320,7 @@ function LoginContent() {
                     type="email"
                     value={registerForm.email}
                     onChange={(event) => setRegisterForm((prev) => ({ ...prev, email: event.target.value }))}
-                    placeholder="voce@exemplo.com"
+                    placeholder="você@exemplo.com"
                     required
                   />
                 </div>
