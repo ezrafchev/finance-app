@@ -364,7 +364,11 @@ export default function DashboardPage() {
   };
 
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Verificando sessão...</p>
+      </div>
+    );
   }
 
   return (

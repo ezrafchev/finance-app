@@ -13,6 +13,9 @@ import { Label } from "@/components/ui/label";
 const USER_STORAGE_KEY = "finance-app-user";
 const SESSION_STORAGE_KEY = "finance-app-session";
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
+const PBKDF2_ITERATIONS = 120000;
+const PBKDF2_HASH = "SHA-256";
+const EMAIL_PATTERN = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
 
 type StoredUser = {
   name: string;
@@ -47,13 +50,35 @@ const createSalt = () => {
     .join("");
 };
 
-const hashPassword = async (value: string, salt: string) => {
-  ensureCrypto();
-  const data = new TextEncoder().encode(`${salt}:${value}`);
-  const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer))
+const hexToBytes = (value: string) => {
+  const bytes: number[] = [];
+  for (let index = 0; index < value.length; index += 2) {
+    bytes.push(Number.parseInt(value.slice(index, index + 2), 16));
+  }
+  return new Uint8Array(bytes);
+};
+
+const bufferToHex = (buffer: ArrayBuffer) => {
+  return Array.from(new Uint8Array(buffer))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+};
+
+const hashPassword = async (value: string, salt: string) => {
+  ensureCrypto();
+  const encoder = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey("raw", encoder.encode(value), "PBKDF2", false, ["deriveBits"]);
+  const hashBuffer = await window.crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: hexToBytes(salt),
+      iterations: PBKDF2_ITERATIONS,
+      hash: PBKDF2_HASH,
+    },
+    keyMaterial,
+    256
+  );
+  return bufferToHex(hashBuffer);
 };
 
 const getStoredUser = () => {
@@ -148,6 +173,10 @@ function LoginContent() {
       }
 
       const email = loginForm.email.trim().toLowerCase();
+      if (!EMAIL_PATTERN.test(email)) {
+        setStatus({ type: "error", text: "Informe um e-mail válido para continuar." });
+        return;
+      }
       const passwordHash = await hashPassword(loginForm.password, storedUser.salt);
 
       if (storedUser.email !== email || storedUser.passwordHash !== passwordHash) {
@@ -185,8 +214,13 @@ function LoginContent() {
         return;
       }
 
-      if (password.length < 6) {
-        setStatus({ type: "error", text: "A senha precisa ter pelo menos 6 caracteres." });
+      if (!EMAIL_PATTERN.test(email)) {
+        setStatus({ type: "error", text: "Informe um e-mail válido para continuar." });
+        return;
+      }
+
+      if (password.length < 8) {
+        setStatus({ type: "error", text: "A senha precisa ter pelo menos 8 caracteres." });
         return;
       }
 
