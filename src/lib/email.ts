@@ -1,6 +1,17 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization to avoid build-time errors when API key is not set
+let resend: Resend | null = null;
+
+function getResendClient() {
+  if (!resend) {
+    // Use a dummy key during build time or when API key is not available
+    // This prevents build failures while still maintaining type safety
+    const apiKey = process.env.RESEND_API_KEY || 're_dummy_key_for_build';
+    resend = new Resend(apiKey);
+  }
+  return resend;
+}
 
 export interface SendVerificationEmailParams {
   to: string;
@@ -26,7 +37,7 @@ export async function sendVerificationEmail({ to, name, verificationUrl }: SendV
     // Set FROM_EMAIL in production to use your verified domain
     const fromEmail = process.env.FROM_EMAIL || 'Finance App <onboarding@resend.dev>';
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: fromEmail,
       to: [to],
       subject: 'Confirme seu e-mail - Finance App',
