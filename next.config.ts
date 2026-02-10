@@ -1,8 +1,8 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  output: 'export',
-  basePath: process.env.NODE_ENV === 'production' ? '/finance-app' : '',
+  // Removed 'output: export' to enable server-side features (API routes, database)
+  // basePath is removed as it's not needed for server deployment
   images: {
     unoptimized: true,
   },
