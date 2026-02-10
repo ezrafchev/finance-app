@@ -50,6 +50,10 @@ const STORAGE_KEYS = {
   transactions: "finance-app-transactions",
 };
 
+const MAX_PROJECTION_MONTHS = 24;
+const MIN_PROJECTION_MONTHS = 1;
+const DEFAULT_PROJECTION_MONTHS = 12;
+
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -67,9 +71,31 @@ const defaultProfile: Profile = {
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
+const parseLocalDate = (value: string) => {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    return new Date();
+  }
+  return new Date(year, month - 1, day);
+};
+
+const generateId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 const parseNumber = (value: string) => {
   const normalized = value.replace(",", ".");
   return Number.isNaN(Number.parseFloat(normalized)) ? 0 : Number.parseFloat(normalized);
+};
+
+const calculateCompoundBalance = (monthlyContribution: number, monthlyRate: number, month: number) => {
+  if (!monthlyRate) {
+    return monthlyContribution * month;
+  }
+  return monthlyContribution * ((Math.pow(1 + monthlyRate, month) - 1) / monthlyRate);
 };
 
 export default function DashboardPage() {
@@ -149,13 +175,14 @@ export default function DashboardPage() {
   const investmentProjection = useMemo(() => {
     const monthlyContribution = parseNumber(investmentForm.monthlyContribution);
     const annualRate = parseNumber(investmentForm.annualRate);
-    const months = Math.min(24, Math.max(1, Number.parseInt(investmentForm.months, 10) || 12));
+    const months = Math.min(
+      MAX_PROJECTION_MONTHS,
+      Math.max(MIN_PROJECTION_MONTHS, Number.parseInt(investmentForm.months, 10) || DEFAULT_PROJECTION_MONTHS)
+    );
     const monthlyRate = annualRate / 12 / 100;
     const data = Array.from({ length: months }, (_, index) => {
       const month = index + 1;
-      const balanceValue = monthlyRate
-        ? monthlyContribution * ((Math.pow(1 + monthlyRate, month) - 1) / monthlyRate)
-        : monthlyContribution * month;
+      const balanceValue = calculateCompoundBalance(monthlyContribution, monthlyRate, month);
       return { month, balance: balanceValue };
     });
 
@@ -200,7 +227,7 @@ export default function DashboardPage() {
     if (!transactionForm.description.trim() || amount <= 0) return;
 
     const newTransaction: Transaction = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      id: generateId(),
       type: transactionForm.type,
       description: transactionForm.description.trim(),
       category: transactionForm.category.trim(),
@@ -588,7 +615,7 @@ export default function DashboardPage() {
                           <TableCell>{transaction.description}</TableCell>
                           <TableCell>{transaction.type === "income" ? "Entrada" : "Saída"}</TableCell>
                           <TableCell>{currencyFormatter.format(transaction.amount)}</TableCell>
-                          <TableCell>{new Date(transaction.date).toLocaleDateString("pt-BR")}</TableCell>
+                          <TableCell>{parseLocalDate(transaction.date).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
