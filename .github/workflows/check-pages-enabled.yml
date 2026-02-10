@@ -1,0 +1,58 @@
+name: Check GitHub Pages Configuration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if GitHub Pages is Enabled
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              console.log('🔍 Checking GitHub Pages configuration...');
+              
+              const pages = await github.rest.repos.getPages({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              
+              console.log('✅ GitHub Pages is enabled!');
+              console.log(`📍 Build type: ${pages.data.build_type || pages.data.source?.type}`);
+              console.log(`🌐 URL: ${pages.data.html_url || pages.data.url}`);
+              
+              if (pages.data.build_type === 'workflow' || pages.data.source?.type === 'workflow') {
+                console.log('✅ Source is correctly set to GitHub Actions!');
+              } else {
+                core.setFailed('⚠️ GitHub Pages source is NOT set to GitHub Actions. Please update repository settings.');
+                console.log('');
+                console.log('📖 To fix this:');
+                console.log('1. Go to: https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/settings/pages');
+                console.log('2. Under "Build and deployment", select Source: GitHub Actions');
+                console.log('3. See GITHUB_PAGES_SETUP.md for detailed instructions (in Portuguese)');
+              }
+            } catch (error) {
+              if (error.status === 404) {
+                core.setFailed('❌ GitHub Pages is NOT enabled for this repository!');
+                console.log('');
+                console.log('📖 To enable GitHub Pages:');
+                console.log('1. Go to: https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/settings/pages');
+                console.log('2. Under "Build and deployment", select Source: GitHub Actions');
+                console.log('3. Save the settings');
+                console.log('');
+                console.log('📚 For detailed instructions in Portuguese, see: GITHUB_PAGES_SETUP.md');
+                console.log('🔗 Direct link: https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/blob/main/GITHUB_PAGES_SETUP.md');
+              } else {
+                core.setFailed('Error checking GitHub Pages: ' + error.message);
+              }
+            }

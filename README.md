@@ -40,17 +40,35 @@ This will create a static export in the `out` directory.
 
 ## GitHub Pages Deployment
 
+![Deployment Status](https://github.com/ezrafchev/finance-app/actions/workflows/deploy.yml/badge.svg)
+
 This project is configured to automatically deploy to GitHub Pages when changes are pushed to the main branch.
 
-### Setup Instructions
+### ⚠️ IMPORTANT: First-Time Setup Required
 
-1. Go to your repository settings on GitHub
-2. Navigate to "Pages" in the left sidebar
-3. Under "Build and deployment", select:
-   - Source: **GitHub Actions**
-4. The workflow will automatically build and deploy your site
+**Before the deployment can work, you MUST enable GitHub Pages:**
 
-The site will be available at: `https://ezrafchev.github.io/finance-app/`
+1. Go to https://github.com/ezrafchev/finance-app/settings/pages
+2. Under "Build and deployment", select:
+   - Source: **GitHub Actions** (not "Deploy from a branch")
+3. Save the settings
+4. Run the workflow: https://github.com/ezrafchev/finance-app/actions
+
+📖 **For detailed Portuguese instructions, see:** [GITHUB_PAGES_SETUP.md](./GITHUB_PAGES_SETUP.md)
+
+### Current Status
+
+- ✅ Application code is ready
+- ✅ Build workflow is configured
+- ✅ Static export works correctly
+- ⚠️ **GitHub Pages needs to be enabled in repository settings**
+
+### After Setup
+
+Once GitHub Pages is enabled:
+- Every push to `main` triggers automatic deployment
+- Site will be available at: `https://ezrafchev.github.io/finance-app/`
+- Deployment takes 2-3 minutes
 
 ### Manual Deployment
 
