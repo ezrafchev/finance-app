@@ -84,7 +84,7 @@ function LoginContent() {
       } else {
         setStatus({ type: "error", text: data.error || "Erro ao reenviar e-mail." });
       }
-    } catch (error) {
+    } catch {
       setStatus({ type: "error", text: "Erro ao conectar ao servidor." });
     } finally {
       setIsSubmitting(false);
@@ -129,7 +129,7 @@ function LoginContent() {
       } else {
         setStatus({ type: "error", text: data.error || "Erro ao fazer login." });
       }
-    } catch (error) {
+    } catch {
       setStatus({ type: "error", text: "Erro ao conectar ao servidor." });
     } finally {
       setIsSubmitting(false);
@@ -194,7 +194,7 @@ function LoginContent() {
       } else {
         setStatus({ type: "error", text: data.error || "Erro ao criar cadastro." });
       }
-    } catch (error) {
+    } catch {
       setStatus({ type: "error", text: "Erro ao conectar ao servidor." });
     } finally {
       setIsSubmitting(false);
