@@ -45,7 +45,7 @@ export default function Home() {
             Controle total das suas finanças
           </h2>
           <p className="text-xl text-muted-foreground mb-8">
-            Cadastros funcionais, banco de dados local, ferramentas avançadas e uma IA gratuita especialista em finanças.
+            Cadastros funcionais com verificação de e-mail, banco de dados seguro, ferramentas avançadas e uma IA gratuita especialista em finanças.
           </p>
           <div className="flex gap-4 justify-center">
             <Button size="lg" className="gap-2" asChild>
@@ -125,9 +125,9 @@ export default function Home() {
               <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <PieChart className="h-6 w-6 text-primary" aria-hidden="true" />
               </div>
-            <CardTitle>Cadastro & banco local</CardTitle>
+            <CardTitle>Cadastro & banco seguro</CardTitle>
             <CardDescription>
-              Salve seus dados no navegador e mantenha histórico completo de transações.
+              Crie sua conta com verificação de e-mail e mantenha histórico completo de transações em banco de dados.
             </CardDescription>
           </CardHeader>
         </Card>

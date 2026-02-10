@@ -24,27 +24,23 @@ export default function PrivacyPage() {
           <CardHeader>
             <CardTitle>Seu controle é prioridade</CardTitle>
             <CardDescription>
-              Esta plataforma armazena seus dados de forma segura em banco de dados com proteção por verificação de e-mail.
+              Esta plataforma foi desenhada para funcionar totalmente no seu navegador, garantindo privacidade e
+              transparência.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>
-              • Os dados de cadastro e transações são armazenados em banco de dados seguro e protegido por autenticação.
+              • Os dados de cadastro e transações são armazenados localmente (localStorage) e não são enviados para
+              servidores externos.
             </p>
             <p>
-              • Sua conta requer verificação de e-mail para garantir segurança adicional no acesso.
+              • Você pode exportar todas as informações em JSON a qualquer momento para manter backups pessoais.
             </p>
             <p>
-              • As senhas são criptografadas usando bcrypt antes de serem armazenadas.
+              • O botão “Limpar dados” remove imediatamente todas as informações locais, garantindo total controle.
             </p>
             <p>
-              • Você pode exportar todas as suas informações em JSON a qualquer momento para manter backups pessoais.
-            </p>
-            <p>
-              • As recomendações da IA são geradas com base nos seus dados e não são compartilhadas com terceiros.
-            </p>
-            <p>
-              • Seus dados financeiros são privados e acessíveis apenas por você através de login seguro.
+              • As recomendações da IA são geradas com base nos dados disponíveis no navegador e não são compartilhadas.
             </p>
           </CardContent>
         </Card>
