@@ -3,6 +3,7 @@
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   ArrowUpRight,
   Calculator,
@@ -26,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { generateRecommendations, type Recommendation } from "@/lib/financial-advisor";
 
 type Profile = {
   name: string;
@@ -146,7 +148,8 @@ export default function DashboardPage() {
     horizon: "12",
     question: "",
   });
-  const [assistantTips, setAssistantTips] = useState<string[]>([]);
+  const [assistantRecommendations, setAssistantRecommendations] = useState<Recommendation[]>([]);
+  const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -231,18 +234,19 @@ export default function DashboardPage() {
     };
   }, [investmentForm]);
 
-  const topExpenseCategory = useMemo(() => {
-    const totals: Record<string, number> = {};
-    transactions
-      .filter((transaction) => transaction.type === "expense")
-      .forEach((transaction) => {
-        const key = transaction.category || "Outros";
-        totals[key] = (totals[key] ?? 0) + transaction.amount;
-      });
+  // topExpenseCategory is now calculated inside the AI advisor
+  // const topExpenseCategory = useMemo(() => {
+  //   const totals: Record<string, number> = {};
+  //   transactions
+  //     .filter((transaction) => transaction.type === "expense")
+  //     .forEach((transaction) => {
+  //       const key = transaction.category || "Outros";
+  //       totals[key] = (totals[key] ?? 0) + transaction.amount;
+  //     });
 
-    const sorted = Object.entries(totals).sort(([, valueA], [, valueB]) => valueB - valueA);
-    return sorted[0];
-  }, [transactions]);
+  //   const sorted = Object.entries(totals).sort(([, valueA], [, valueB]) => valueB - valueA);
+  //   return sorted[0];
+  // }, [transactions]);
 
   const handleProfileChange = (field: keyof Profile) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setProfile((prev) => ({ ...prev, [field]: event.target.value }));
@@ -251,15 +255,35 @@ export default function DashboardPage() {
   const handleProfileSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (typeof window === "undefined") return;
-    const savedAt = new Date().toISOString();
-    setProfileSavedAt(savedAt);
-    window.localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify({ ...profile, savedAt }));
+    try {
+      const savedAt = new Date().toISOString();
+      setProfileSavedAt(savedAt);
+      window.localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify({ ...profile, savedAt }));
+      toast.success("Perfil salvo com sucesso!", {
+        description: "Suas informações financeiras foram atualizadas.",
+      });
+    } catch {
+      toast.error("Erro ao salvar perfil", {
+        description: "Não foi possível salvar suas informações.",
+      });
+    }
   };
 
   const handleAddTransaction = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const amount = parseNumber(transactionForm.amount);
-    if (!transactionForm.description.trim() || amount <= 0) return;
+    if (!transactionForm.description.trim()) {
+      toast.error("Descrição obrigatória", {
+        description: "Informe uma descrição para a transação.",
+      });
+      return;
+    }
+    if (amount <= 0) {
+      toast.error("Valor inválido", {
+        description: "O valor deve ser maior que zero.",
+      });
+      return;
+    }
 
     const newTransaction: Transaction = {
       id: generateId(),
@@ -284,6 +308,10 @@ export default function DashboardPage() {
       category: "",
       amount: "",
     }));
+
+    toast.success("Transação registrada!", {
+      description: `${transactionForm.type === "income" ? "Entrada" : "Saída"} de ${currencyFormatter.format(amount)} adicionada.`,
+    });
   };
 
   const handleRemoveTransaction = (id: string) => {
@@ -294,73 +322,78 @@ export default function DashboardPage() {
       }
       return updated;
     });
+    toast.success("Transação removida", {
+      description: "A transação foi excluída do histórico.",
+    });
   };
 
   const handleExportData = () => {
     if (typeof window === "undefined") return;
-    const payload = {
-      profile,
-      transactions,
-      exportedAt: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "finance-app-dados.json";
-    anchor.click();
-    window.URL.revokeObjectURL(url);
+    try {
+      const payload = {
+        profile,
+        transactions,
+        exportedAt: new Date().toISOString(),
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `finance-app-dados-${new Date().toISOString().split('T')[0]}.json`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Dados exportados!", {
+        description: "Arquivo JSON baixado com sucesso.",
+      });
+    } catch {
+      toast.error("Erro ao exportar", {
+        description: "Não foi possível exportar os dados.",
+      });
+    }
   };
 
   const handleClearData = () => {
+    if (!window.confirm("Tem certeza que deseja limpar TODOS os dados? Esta ação não pode ser desfeita.")) {
+      return;
+    }
     setProfile(defaultProfile);
     setProfileSavedAt(null);
     setTransactions([]);
-    setAssistantTips([]);
+    setAssistantRecommendations([]);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(STORAGE_KEYS.profile);
       window.localStorage.removeItem(STORAGE_KEYS.transactions);
     }
+    toast.info("Dados limpos", {
+      description: "Todos os dados foram removidos do navegador.",
+    });
   };
 
   const handleGenerateAdvice = () => {
-    const tips: string[] = [];
-
-    if (!monthlyIncome) {
-      tips.push("Informe sua renda mensal para receber recomendações mais precisas.");
-    }
-
-    if (monthlyIncome && monthlyExpenses > monthlyIncome) {
-      tips.push("Seus gastos estão acima da renda. Revise despesas fixas e renegocie contratos.");
-    } else if (monthlyIncome && savingsRate < 0.2) {
-      tips.push("Seu índice de poupança está abaixo de 20%. Ajuste gastos variáveis para aumentar a reserva.");
-    } else if (monthlyIncome) {
-      tips.push("Bom trabalho! Seu fluxo mensal está equilibrado. Continue registrando transações.");
-    }
-
-    if (assistantForm.goal === "investir") {
-      tips.push(
-        `Para investir com perfil ${profile.riskProfile}, diversifique entre renda fixa e variável e mantenha uma reserva de ${currencyFormatter.format(emergencyFund)}.`
+    setIsGeneratingRecommendations(true);
+    
+    try {
+      const horizon = parseInt(assistantForm.horizon) || 12;
+      const recommendations = generateRecommendations(
+        profile,
+        transactions,
+        assistantForm.goal,
+        horizon,
+        assistantForm.question
       );
-    } else if (assistantForm.goal === "reserva") {
-      tips.push(`Priorize a reserva de emergência entre 3 e 6 meses (${currencyFormatter.format(emergencyFund)}).`);
-    } else {
-      tips.push("Mantenha o orçamento 50/30/20 como referência e acompanhe seus limites semanalmente.");
+      
+      setAssistantRecommendations(recommendations);
+      
+      toast.success("Recomendações geradas!", {
+        description: `${recommendations.length} dicas personalizadas prontas para você.`,
+      });
+    } catch {
+      toast.error("Erro ao gerar recomendações", {
+        description: "Não foi possível processar suas informações.",
+      });
+    } finally {
+      setIsGeneratingRecommendations(false);
     }
-
-    if (topExpenseCategory && topExpenseCategory[1] > 0) {
-      tips.push(`A categoria com maior impacto é "${topExpenseCategory[0]}". Avalie metas de redução específicas.`);
-    }
-
-    if (assistantForm.question.trim()) {
-      tips.push(`Sobre sua pergunta: "${assistantForm.question.trim()}", foque em metas realistas e revise mensalmente.`);
-    }
-
-    if (!tips.length) {
-      tips.push("Preencha seus dados para receber recomendações personalizadas.");
-    }
-
-    setAssistantTips(tips);
   };
 
   if (!isAuthenticated) {
@@ -836,7 +869,9 @@ export default function DashboardPage() {
                     placeholder="Ex: Quero reduzir gastos e investir mais"
                   />
                 </div>
-                <Button onClick={handleGenerateAdvice} className="w-full">Gerar recomendações</Button>
+                <Button onClick={handleGenerateAdvice} className="w-full" disabled={isGeneratingRecommendations}>
+                  {isGeneratingRecommendations ? "Gerando..." : "Gerar recomendações"}
+                </Button>
               </CardContent>
             </Card>
 
@@ -846,14 +881,35 @@ export default function DashboardPage() {
                 <CardDescription>Dicas geradas gratuitamente para você aplicar agora.</CardDescription>
               </CardHeader>
               <CardContent>
-                {assistantTips.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhuma recomendação ainda. Clique em “Gerar”.</p>
+                {assistantRecommendations.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground">Nenhuma recomendação ainda.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Clique em &quot;Gerar recomendações&quot; para começar.</p>
+                  </div>
                 ) : (
-                  <ul className="list-disc space-y-2 pl-5 text-sm">
-                    {assistantTips.map((tip, index) => (
-                      <li key={index}>{tip}</li>
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                    {assistantRecommendations.map((rec, index) => (
+                      <div 
+                        key={index} 
+                        className="rounded-lg border-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200"
+                      >
+                        <h4 className="font-semibold text-sm mb-1">{rec.title}</h4>
+                        <p className="text-xs text-muted-foreground mb-2">{rec.description}</p>
+                        <div className="space-y-1">
+                          {rec.actionItems.map((item, itemIndex) => (
+                            <div key={itemIndex} className="flex items-start gap-2 text-xs">
+                              <span className="text-primary flex-shrink-0">•</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-border/50">
+                          <span className="text-xs font-medium text-muted-foreground">{rec.category}</span>
+                        </div>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </CardContent>
             </Card>
