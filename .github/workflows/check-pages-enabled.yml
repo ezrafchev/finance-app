@@ -8,6 +8,9 @@ on:
     paths:
       - '.github/workflows/deploy.yml'
 
+permissions:
+  contents: read
+
 jobs:
   check-pages:
     runs-on: ubuntu-latest
