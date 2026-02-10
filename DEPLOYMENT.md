@@ -18,10 +18,14 @@ This document provides instructions for deploying the Finance App to GitHub Page
    - **Source**: Select "GitHub Actions"
    - This will use the workflow defined in `.github/workflows/deploy.yml`
 
-### 2. Merge the PR
+### 2. Ensure Changes Are on Main Branch
 
-1. Review and merge the pull request that contains the GitHub Pages setup
-2. Once merged to the `main` branch, the GitHub Actions workflow will automatically trigger
+**IMPORTANT**: The application files and workflow must be on the `main` branch for deployment to work.
+
+If you're seeing a 404 error, it likely means the PR hasn't been merged to main yet. Merge the PR containing:
+- Application structure (`src/app/layout.tsx`, `src/app/page.tsx`)
+- GitHub Actions workflow (`.github/workflows/deploy.yml`)
+- Updated configuration (`next.config.ts`, `package.json`)
 
 ### 3. Monitor Deployment
 
@@ -53,20 +57,34 @@ You can manually trigger a deployment at any time:
 ### Workflow Fails to Run
 
 - Ensure GitHub Actions is enabled in repository settings
-- Check that the workflow file exists at `.github/workflows/deploy.yml`
+- Check that the workflow file exists at `.github/workflows/deploy.yml` on the main branch
 - Verify you have the necessary permissions
 
 ### 404 Error After Deployment
 
-- Make sure GitHub Pages is set to use "GitHub Actions" as the source
-- Check that the `basePath` in `next.config.ts` matches your repository name
+#### Most Common Cause: Changes Not on Main Branch
+- Verify the PR has been merged to `main`
+- Check that `src/app/layout.tsx` and `src/app/page.tsx` exist on main
+- Ensure `.github/workflows/deploy.yml` exists on main
+
+#### Other Causes:
+- Make sure GitHub Pages is set to use "GitHub Actions" as the source (not "Deploy from a branch")
 - Wait a few minutes after deployment for DNS propagation
+- Check that the workflow completed successfully in the Actions tab
 
 ### Build Fails
 
 - Check the Actions tab for detailed error logs
 - Ensure all dependencies are correctly listed in `package.json`
 - Verify the build works locally with `npm run build`
+
+### Permission Errors
+
+GitHub Actions needs permission to deploy:
+1. Go to Settings → Actions → General → Workflow permissions
+2. Select "Read and write permissions"
+3. Check "Allow GitHub Actions to create and approve pull requests"
+4. Save
 
 ## Updating the Site
 
@@ -100,3 +118,5 @@ The site should open at `http://localhost:3000` (or another port shown in termin
 - Images are unoptimized for static site compatibility
 - The `.nojekyll` file ensures GitHub Pages serves Next.js files correctly
 - The workflow runs on every push to `main` or can be triggered manually
+- Configuration has been simplified to work without basePath for easier deployment
+
