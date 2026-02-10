@@ -3,19 +3,119 @@
 import { type FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Wallet, AlertCircle, CheckCircle, Mail } from "lucide-react";
+import { Wallet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
+const USER_STORAGE_KEY = "finance-app-user";
+const SESSION_STORAGE_KEY = "finance-app-session";
+const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
+const PBKDF2_ITERATIONS = 120000;
+const PBKDF2_HASH = "SHA-256";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+type StoredUser = {
+  name: string;
+  email: string;
+  salt: string;
+  passwordHash: string;
+  createdAt: string;
+};
+
+type StoredSession = {
+  email: string;
+  signedInAt: string;
+};
+
 type StatusMessage = {
-  type: "success" | "error" | "info";
+  type: "success" | "error";
   text: string;
+};
+
+const ensureCrypto = () => {
+  if (typeof window === "undefined" || !window.crypto?.subtle) {
+    throw new Error("Seu navegador não suporta criptografia necessária para login seguro.");
+  }
+};
+
+const createSalt = () => {
+  ensureCrypto();
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+const hexToBytes = (value: string) => {
+  const bytes: number[] = [];
+  for (let index = 0; index < value.length; index += 2) {
+    bytes.push(Number.parseInt(value.slice(index, index + 2), 16));
+  }
+  return new Uint8Array(bytes);
+};
+
+const bufferToHex = (buffer: ArrayBuffer) => {
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+const hashPassword = async (value: string, salt: string) => {
+  ensureCrypto();
+  const encoder = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey("raw", encoder.encode(value), "PBKDF2", false, ["deriveBits"]);
+  const hashBuffer = await window.crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: hexToBytes(salt),
+      iterations: PBKDF2_ITERATIONS,
+      hash: PBKDF2_HASH,
+    },
+    keyMaterial,
+    256
+  );
+  return bufferToHex(hashBuffer);
+};
+
+const getStoredUser = () => {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(USER_STORAGE_KEY);
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as StoredUser;
+    if (!parsed.email || !parsed.passwordHash || !parsed.salt) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const getStoredSession = () => {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as StoredSession;
+    if (!parsed.email || !parsed.signedInAt) return null;
+    const signedInAt = new Date(parsed.signedInAt).getTime();
+    if (!Number.isFinite(signedInAt) || Date.now() - signedInAt > SESSION_MAX_AGE_MS) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const clearSession = () => {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
 };
 
 function LoginContent() {
@@ -24,8 +124,6 @@ function LoginContent() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [needsVerification, setNeedsVerification] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [registerForm, setRegisterForm] = useState({
     name: "",
@@ -35,102 +133,67 @@ function LoginContent() {
   });
 
   useEffect(() => {
-    // Check for verification status
-    const verified = searchParams.get("verified");
-    const error = searchParams.get("error");
-    const modeParam = searchParams.get("mode");
-
-    if (verified === "true") {
-      setStatus({
-        type: "success",
-        text: "E-mail verificado com sucesso! Agora você pode fazer login.",
-      });
-      setMode("login");
-    } else if (error) {
-      let errorMsg = "Erro ao verificar e-mail.";
-      if (error === "expired-token") {
-        errorMsg = "Link de verificação expirado. Solicite um novo link.";
-      } else if (error === "invalid-token") {
-        errorMsg = "Link de verificação inválido.";
-      }
-      setStatus({ type: "error", text: errorMsg });
+    if (typeof window === "undefined") return;
+    const session = getStoredSession();
+    if (session) {
+      router.replace("/dashboard");
+      return;
     }
+    clearSession();
+  }, [router]);
+
+  useEffect(() => {
+    const modeParam = searchParams.get("mode");
+    const storedUser = getStoredUser();
 
     if (modeParam === "register") {
       setMode("register");
+      return;
     }
+
+    if (!storedUser) {
+      setMode("register");
+      return;
+    }
+
+    setMode("login");
   }, [searchParams]);
-
-  const handleResendVerification = async () => {
-    if (!userEmail) return;
-
-    setIsSubmitting(true);
-    setStatus(null);
-
-    try {
-      const response = await fetch("/api/auth/resend-verification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: userEmail }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setStatus({
-          type: "success",
-          text: "E-mail de verificação reenviado! Verifique sua caixa de entrada.",
-        });
-      } else {
-        setStatus({ type: "error", text: data.error || "Erro ao reenviar e-mail." });
-      }
-    } catch (error) {
-      setStatus({ type: "error", text: "Erro ao conectar ao servidor." });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleLoginSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus(null);
     setIsSubmitting(true);
-    setNeedsVerification(false);
 
     try {
-      const email = loginForm.email.trim().toLowerCase();
-      if (!EMAIL_PATTERN.test(email)) {
-        setStatus({ type: "error", text: "Informe um e-mail válido para continuar." });
-        setIsSubmitting(false);
+      const storedUser = getStoredUser();
+      if (!storedUser) {
+        setStatus({ type: "error", text: "Nenhum cadastro encontrado. Crie sua conta para continuar." });
+        setMode("register");
         return;
       }
 
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "login",
-          email,
-          password: loginForm.password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        router.replace("/dashboard");
-      } else if (data.requiresVerification) {
-        setNeedsVerification(true);
-        setUserEmail(email);
-        setStatus({
-          type: "error",
-          text: data.error || "Por favor, confirme seu e-mail antes de fazer login.",
-        });
-      } else {
-        setStatus({ type: "error", text: data.error || "Erro ao fazer login." });
+      const email = loginForm.email.trim().toLowerCase();
+      if (!EMAIL_PATTERN.test(email)) {
+        setStatus({ type: "error", text: "Informe um e-mail válido para continuar." });
+        return;
       }
+      const passwordHash = await hashPassword(loginForm.password, storedUser.salt);
+
+      if (storedUser.email !== email || storedUser.passwordHash !== passwordHash) {
+        setStatus({ type: "error", text: "E-mail ou senha incorretos." });
+        return;
+      }
+
+      window.localStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({ email: storedUser.email, signedInAt: new Date().toISOString() })
+      );
+      router.replace("/dashboard");
     } catch (error) {
-      setStatus({ type: "error", text: "Erro ao conectar ao servidor." });
+      setStatus({
+        type: "error",
+        text: error instanceof Error ? error.message : "Não foi possível validar seus dados no momento.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -148,64 +211,61 @@ function LoginContent() {
 
       if (!name || !email || !password || !registerForm.confirmPassword) {
         setStatus({ type: "error", text: "Preencha todos os campos obrigatórios." });
-        setIsSubmitting(false);
         return;
       }
 
       if (!EMAIL_PATTERN.test(email)) {
         setStatus({ type: "error", text: "Informe um e-mail válido para continuar." });
-        setIsSubmitting(false);
         return;
       }
 
       if (password.length < 8) {
         setStatus({ type: "error", text: "A senha precisa ter pelo menos 8 caracteres." });
-        setIsSubmitting(false);
         return;
       }
 
       if (password !== registerForm.confirmPassword) {
         setStatus({ type: "error", text: "As senhas não conferem." });
-        setIsSubmitting(false);
         return;
       }
 
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "register",
-          email,
-          password,
-          name,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setNeedsVerification(true);
-        setUserEmail(email);
+      const existing = getStoredUser();
+      if (existing) {
         setStatus({
-          type: "success",
-          text: data.message || "Cadastro realizado! Verifique seu e-mail para confirmar sua conta.",
+          type: "error",
+          text: "Já existe um cadastro neste navegador. Faça login com ele.",
         });
-        setRegisterForm({ name: "", email: "", password: "", confirmPassword: "" });
-      } else {
-        setStatus({ type: "error", text: data.error || "Erro ao criar cadastro." });
+        setMode("login");
+        return;
       }
+
+      const salt = createSalt();
+      const passwordHash = await hashPassword(password, salt);
+      const newUser: StoredUser = {
+        name,
+        email,
+        salt,
+        passwordHash,
+        createdAt: new Date().toISOString(),
+      };
+
+      window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
+      window.localStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({ email: newUser.email, signedInAt: new Date().toISOString() })
+      );
+      router.replace("/dashboard");
     } catch (error) {
-      setStatus({ type: "error", text: "Erro ao conectar ao servidor." });
+      setStatus({
+        type: "error",
+        text: error instanceof Error ? error.message : "Não foi possível criar sua conta no momento.",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const getStatusIcon = () => {
-    if (status?.type === "success") return <CheckCircle className="h-5 w-5 text-green-600" />;
-    if (status?.type === "error") return <AlertCircle className="h-5 w-5 text-red-600" />;
-    return <Mail className="h-5 w-5 text-blue-600" />;
-  };
+  const statusClasses = status?.type === "error" ? "text-red-600" : "text-green-600";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -232,55 +292,21 @@ function LoginContent() {
               <Button
                 type="button"
                 variant={mode === "login" ? "default" : "outline"}
-                onClick={() => {
-                  setMode("login");
-                  setStatus(null);
-                  setNeedsVerification(false);
-                }}
+                onClick={() => setMode("login")}
               >
                 Entrar
               </Button>
               <Button
                 type="button"
                 variant={mode === "register" ? "default" : "outline"}
-                onClick={() => {
-                  setMode("register");
-                  setStatus(null);
-                  setNeedsVerification(false);
-                }}
+                onClick={() => setMode("register")}
               >
                 Criar conta
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {status && (
-              <Alert className="mb-4" variant={status.type === "error" ? "destructive" : "default"}>
-                <div className="flex items-center gap-2">
-                  {getStatusIcon()}
-                  <AlertDescription>{status.text}</AlertDescription>
-                </div>
-              </Alert>
-            )}
-
-            {needsVerification && (
-              <Alert className="mb-4">
-                <Mail className="h-4 w-4" />
-                <AlertDescription>
-                  <div className="space-y-2">
-                    <p>Não recebeu o e-mail?</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleResendVerification}
-                      disabled={isSubmitting}
-                    >
-                      Reenviar e-mail de verificação
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
+            {status ? <p className={`mb-4 text-sm ${statusClasses}`}>{status.text}</p> : null}
 
             {mode === "login" ? (
               <form className="space-y-4" onSubmit={handleLoginSubmit}>
@@ -359,7 +385,7 @@ function LoginContent() {
             )}
 
             <p className="mt-6 text-xs text-muted-foreground">
-              Seus dados são armazenados com segurança em banco de dados e protegidos por verificação de e-mail.
+              Seus dados ficam salvos apenas neste navegador para acesso seguro ao painel financeiro.
             </p>
           </CardContent>
         </Card>
