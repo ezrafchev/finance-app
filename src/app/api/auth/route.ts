@@ -4,6 +4,10 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { sendVerificationEmail } from '@/lib/email';
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET environment variable is required in production');
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key';
 const APP_URL = process.env.APP_URL || 'http://localhost:8000';
 
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Hash password
+      // Hash password with bcrypt cost factor 10 (OWASP recommended)
       const passwordHash = await bcrypt.hash(password, 10);
 
       // Create user with profile

@@ -22,8 +22,12 @@ export async function sendVerificationEmail({ to, name, verificationUrl }: SendV
       return { success: true, messageId: 'dev-mode' };
     }
 
+    // Use environment variable for sender email in production, fallback to Resend test domain
+    // Set FROM_EMAIL in production to use your verified domain
+    const fromEmail = process.env.FROM_EMAIL || 'Finance App <onboarding@resend.dev>';
+
     const { data, error } = await resend.emails.send({
-      from: 'Finance App <onboarding@resend.dev>',
+      from: fromEmail,
       to: [to],
       subject: 'Confirme seu e-mail - Finance App',
       html: `
