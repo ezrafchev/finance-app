@@ -1,5 +1,23 @@
 // Client-side Financial AI Advisor
-import { type Profile, type Transaction, calculateMetrics } from './client-storage';
+
+export interface Profile {
+  name: string;
+  email: string;
+  monthlyIncome: number;
+  fixedExpenses: number;
+  variableExpenses: number;
+  riskProfile: string;
+  mainGoal: string;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'income' | 'expense';
+  description: string;
+  category: string;
+  amount: number;
+  date: string;
+}
 
 export interface Recommendation {
   title: string;
@@ -10,8 +28,33 @@ export interface Recommendation {
   icon: string;
 }
 
-function parseNumber(value: string): number {
-  return parseFloat(value.replace(',', '.')) || 0;
+function calculateMetrics(profile: Profile, transactions: Transaction[]) {
+  const monthlyIncome = profile.monthlyIncome || 0;
+  const fixedExpenses = profile.fixedExpenses || 0;
+  const variableExpenses = profile.variableExpenses || 0;
+  const monthlyExpenses = fixedExpenses + variableExpenses;
+  
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const totalExpenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const balance = totalIncome - totalExpenses;
+  const monthlyFreeCashFlow = monthlyIncome - monthlyExpenses;
+  const savingsRate = monthlyIncome > 0 ? (monthlyFreeCashFlow / monthlyIncome) * 100 : 0;
+  const emergencyFundTarget = monthlyExpenses * 6;
+  
+  return {
+    totalIncome,
+    totalExpenses,
+    balance,
+    savingsRate,
+    monthlyFreeCashFlow,
+    emergencyFundTarget,
+  };
 }
 
 export function generateRecommendations(
@@ -23,9 +66,9 @@ export function generateRecommendations(
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
   
-  const monthlyIncome = parseNumber(profile.monthlyIncome);
-  const fixedExpenses = parseNumber(profile.fixedExpenses);
-  const variableExpenses = parseNumber(profile.variableExpenses);
+  const monthlyIncome = profile.monthlyIncome || 0;
+  const fixedExpenses = profile.fixedExpenses || 0;
+  const variableExpenses = profile.variableExpenses || 0;
   const totalExpenses = fixedExpenses + variableExpenses;
   const freeCashFlow = monthlyIncome - totalExpenses;
   const savingsRate = monthlyIncome > 0 ? (freeCashFlow / monthlyIncome) * 100 : 0;

@@ -2,7 +2,6 @@
 
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowUpRight,
@@ -28,13 +27,14 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { generateRecommendations, type Recommendation } from "@/lib/financial-advisor";
+import { apiClient } from "@/lib/api-client";
 
 type Profile = {
   name: string;
   email: string;
-  monthlyIncome: string;
-  fixedExpenses: string;
-  variableExpenses: string;
+  monthlyIncome: number;
+  fixedExpenses: number;
+  variableExpenses: number;
   riskProfile: string;
   mainGoal: string;
 };
@@ -48,17 +48,9 @@ type Transaction = {
   date: string;
 };
 
-const STORAGE_KEYS = {
-  profile: "finance-app-profile",
-  transactions: "finance-app-transactions",
-  session: "finance-app-session",
-  user: "finance-app-user",
-};
-
 const MAX_PROJECTION_MONTHS = 24;
 const MIN_PROJECTION_MONTHS = 1;
 const DEFAULT_PROJECTION_MONTHS = 12;
-const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -68,9 +60,9 @@ const currencyFormatter = new Intl.NumberFormat("pt-BR", {
 const defaultProfile: Profile = {
   name: "",
   email: "",
-  monthlyIncome: "",
-  fixedExpenses: "",
-  variableExpenses: "",
+  monthlyIncome: 0,
+  fixedExpenses: 0,
+  variableExpenses: 0,
   riskProfile: "moderado",
   mainGoal: "equilibrar",
 };
@@ -85,13 +77,6 @@ const parseLocalDate = (value: string) => {
   return new Date(year, month - 1, day);
 };
 
-const generateId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
-
 const parseNumber = (value: string) => {
   const normalized = value.replace(",", ".");
   return Number.isNaN(Number.parseFloat(normalized)) ? 0 : Number.parseFloat(normalized);
@@ -104,32 +89,9 @@ const calculateCompoundBalance = (monthlyContribution: number, monthlyRate: numb
   return monthlyContribution * ((Math.pow(1 + monthlyRate, month) - 1) / monthlyRate);
 };
 
-const getValidSession = () => {
-  if (typeof window === "undefined") return null;
-  const stored = window.localStorage.getItem(STORAGE_KEYS.session);
-  if (!stored) return null;
-  try {
-    const parsed = JSON.parse(stored) as { email?: string; signedInAt?: string };
-    if (!parsed.email || !parsed.signedInAt) return null;
-    const signedInAt = new Date(parsed.signedInAt).getTime();
-    if (!Number.isFinite(signedInAt) || Date.now() - signedInAt > SESSION_MAX_AGE_MS) {
-      return null;
-    }
-    const storedUser = window.localStorage.getItem(STORAGE_KEYS.user);
-    if (!storedUser) return null;
-    const user = JSON.parse(storedUser) as { email?: string };
-    if (!user.email || user.email !== parsed.email) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
 export default function DashboardPage() {
-  const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<Profile>(defaultProfile);
-  const [profileSavedAt, setProfileSavedAt] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionForm, setTransactionForm] = useState({
     description: "",
@@ -152,35 +114,35 @@ export default function DashboardPage() {
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const session = getValidSession();
-    if (!session) {
-      window.localStorage.removeItem(STORAGE_KEYS.session);
-      router.replace("/login");
-      return;
-    }
-    setIsAuthenticated(true);
-
-    const storedProfile = window.localStorage.getItem(STORAGE_KEYS.profile);
-    if (storedProfile) {
-      const parsed = JSON.parse(storedProfile) as Profile & { savedAt?: string };
-      setProfile({ ...defaultProfile, ...parsed });
-      if (parsed.savedAt) {
-        setProfileSavedAt(parsed.savedAt);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch profile and transactions from backend
+        const [profileData, transactionsData] = await Promise.all([
+          apiClient.fetchProfile(),
+          apiClient.fetchTransactions(),
+        ]);
+        
+        setProfile(profileData);
+        setTransactions(transactionsData);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        toast.error("Erro ao carregar dados", {
+          description: "Redirecionando para login...",
+        });
+        // apiClient will handle redirect to login on 401/403
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
 
-    const storedTransactions = window.localStorage.getItem(STORAGE_KEYS.transactions);
-    if (storedTransactions) {
-      const parsed = JSON.parse(storedTransactions) as Transaction[];
-      setTransactions(parsed);
-    }
-  }, [router]);
+    loadData();
+  }, []);
 
-  const monthlyIncome = parseNumber(profile.monthlyIncome);
-  const fixedExpenses = parseNumber(profile.fixedExpenses);
-  const variableExpenses = parseNumber(profile.variableExpenses);
+  const monthlyIncome = profile.monthlyIncome || 0;
+  const fixedExpenses = profile.fixedExpenses || 0;
+  const variableExpenses = profile.variableExpenses || 0;
   const monthlyExpenses = fixedExpenses + variableExpenses;
   const monthlySavings = monthlyIncome - monthlyExpenses;
   const savingsRate = monthlyIncome > 0 ? monthlySavings / monthlyIncome : 0;
@@ -249,27 +211,39 @@ export default function DashboardPage() {
   // }, [transactions]);
 
   const handleProfileChange = (field: keyof Profile) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setProfile((prev) => ({ ...prev, [field]: event.target.value }));
+    const value = event.target.value;
+    setProfile((prev) => ({
+      ...prev,
+      [field]: field === 'monthlyIncome' || field === 'fixedExpenses' || field === 'variableExpenses'
+        ? parseNumber(value)
+        : value
+    }));
   };
 
-  const handleProfileSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (typeof window === "undefined") return;
     try {
-      const savedAt = new Date().toISOString();
-      setProfileSavedAt(savedAt);
-      window.localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify({ ...profile, savedAt }));
-      toast.success("Perfil salvo com sucesso!", {
-        description: "Suas informações financeiras foram atualizadas.",
+      const updatedProfile = await apiClient.updateProfile({
+        monthlyIncome: profile.monthlyIncome,
+        fixedExpenses: profile.fixedExpenses,
+        variableExpenses: profile.variableExpenses,
+        riskProfile: profile.riskProfile,
+        mainGoal: profile.mainGoal,
       });
-    } catch {
+      
+      setProfile(updatedProfile);
+      toast.success("Perfil salvo com sucesso!", {
+        description: "Suas informações financeiras foram atualizadas no servidor.",
+      });
+    } catch (error) {
+      console.error('Profile update error:', error);
       toast.error("Erro ao salvar perfil", {
         description: "Não foi possível salvar suas informações.",
       });
     }
   };
 
-  const handleAddTransaction = (event: FormEvent<HTMLFormElement>) => {
+  const handleAddTransaction = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const amount = parseNumber(transactionForm.amount);
     if (!transactionForm.description.trim()) {
@@ -285,46 +259,48 @@ export default function DashboardPage() {
       return;
     }
 
-    const newTransaction: Transaction = {
-      id: generateId(),
-      type: transactionForm.type,
-      description: transactionForm.description.trim(),
-      category: transactionForm.category.trim(),
-      amount,
-      date: transactionForm.date || getToday(),
-    };
+    try {
+      const newTransaction = await apiClient.createTransaction({
+        type: transactionForm.type,
+        description: transactionForm.description.trim(),
+        category: transactionForm.category.trim() || 'Outros',
+        amount,
+        date: transactionForm.date || getToday(),
+      });
 
-    setTransactions((prev) => {
-      const updated = [newTransaction, ...prev];
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(updated));
-      }
-      return updated;
-    });
+      setTransactions((prev) => [newTransaction, ...prev]);
 
-    setTransactionForm((prev) => ({
-      ...prev,
-      description: "",
-      category: "",
-      amount: "",
-    }));
+      setTransactionForm((prev) => ({
+        ...prev,
+        description: "",
+        category: "",
+        amount: "",
+      }));
 
-    toast.success("Transação registrada!", {
-      description: `${transactionForm.type === "income" ? "Entrada" : "Saída"} de ${currencyFormatter.format(amount)} adicionada.`,
-    });
+      toast.success("Transação registrada!", {
+        description: `${transactionForm.type === "income" ? "Entrada" : "Saída"} de ${currencyFormatter.format(amount)} adicionada ao servidor.`,
+      });
+    } catch (error) {
+      console.error('Transaction creation error:', error);
+      toast.error("Erro ao adicionar transação", {
+        description: "Não foi possível salvar a transação.",
+      });
+    }
   };
 
-  const handleRemoveTransaction = (id: string) => {
-    setTransactions((prev) => {
-      const updated = prev.filter((transaction) => transaction.id !== id);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(updated));
-      }
-      return updated;
-    });
-    toast.success("Transação removida", {
-      description: "A transação foi excluída do histórico.",
-    });
+  const handleRemoveTransaction = async (id: string) => {
+    try {
+      await apiClient.deleteTransaction(id);
+      setTransactions((prev) => prev.filter((transaction) => transaction.id !== id));
+      toast.success("Transação removida", {
+        description: "A transação foi excluída do servidor.",
+      });
+    } catch (error) {
+      console.error('Transaction deletion error:', error);
+      toast.error("Erro ao remover transação", {
+        description: "Não foi possível excluir a transação.",
+      });
+    }
   };
 
   const handleExportData = () => {
@@ -352,21 +328,28 @@ export default function DashboardPage() {
     }
   };
 
-  const handleClearData = () => {
-    if (!window.confirm("Tem certeza que deseja limpar TODOS os dados? Esta ação não pode ser desfeita.")) {
+  const handleClearData = async () => {
+    if (!window.confirm("Tem certeza que deseja limpar TODOS os dados? Esta ação removerá todas as transações do servidor.")) {
       return;
     }
-    setProfile(defaultProfile);
-    setProfileSavedAt(null);
-    setTransactions([]);
-    setAssistantRecommendations([]);
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(STORAGE_KEYS.profile);
-      window.localStorage.removeItem(STORAGE_KEYS.transactions);
+    
+    try {
+      // Delete all transactions one by one
+      const deletePromises = transactions.map(t => apiClient.deleteTransaction(t.id));
+      await Promise.all(deletePromises);
+      
+      setTransactions([]);
+      setAssistantRecommendations([]);
+      
+      toast.info("Transações removidas", {
+        description: "Todas as transações foram removidas do servidor.",
+      });
+    } catch (error) {
+      console.error('Clear data error:', error);
+      toast.error("Erro ao limpar dados", {
+        description: "Não foi possível remover todas as transações.",
+      });
     }
-    toast.info("Dados limpos", {
-      description: "Todos os dados foram removidos do navegador.",
-    });
   };
 
   const handleGenerateAdvice = () => {
@@ -396,10 +379,10 @@ export default function DashboardPage() {
     }
   };
 
-  if (!isAuthenticated) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Verificando sessão...</p>
+        <p className="text-sm text-muted-foreground">Carregando dados do servidor...</p>
       </div>
     );
   }
@@ -500,11 +483,10 @@ export default function DashboardPage() {
         <section id="cadastro" className="mt-12">
           <div className="flex items-center gap-2">
             <Database className="h-5 w-5 text-primary" aria-hidden="true" />
-            <h3 className="text-2xl font-semibold">Cadastro e banco de dados local</h3>
+            <h3 className="text-2xl font-semibold">Perfil e banco de dados no servidor</h3>
           </div>
           <p className="text-muted-foreground mt-2">
-            Preencha seus dados para salvar o perfil financeiro diretamente no navegador e manter o histórico sempre
-            disponível.
+            Seus dados financeiros são salvos de forma segura no servidor backend e ficam disponíveis sempre que você fizer login.
           </p>
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -526,17 +508,17 @@ export default function DashboardPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="income">Renda mensal (R$)</Label>
-                      <Input id="income" inputMode="decimal" value={profile.monthlyIncome} onChange={handleProfileChange("monthlyIncome")} placeholder="5000" />
+                      <Input id="income" inputMode="decimal" value={profile.monthlyIncome || ''} onChange={handleProfileChange("monthlyIncome")} placeholder="5000" />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="fixed">Despesas fixas (R$)</Label>
-                      <Input id="fixed" inputMode="decimal" value={profile.fixedExpenses} onChange={handleProfileChange("fixedExpenses")} placeholder="2500" />
+                      <Input id="fixed" inputMode="decimal" value={profile.fixedExpenses || ''} onChange={handleProfileChange("fixedExpenses")} placeholder="2500" />
                     </div>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="variable">Despesas variáveis (R$)</Label>
-                      <Input id="variable" inputMode="decimal" value={profile.variableExpenses} onChange={handleProfileChange("variableExpenses")} placeholder="1200" />
+                      <Input id="variable" inputMode="decimal" value={profile.variableExpenses || ''} onChange={handleProfileChange("variableExpenses")} placeholder="1200" />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="risk">Perfil de risco</Label>
@@ -573,7 +555,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Resumo do perfil</CardTitle>
-                <CardDescription>Dados salvos localmente no seu navegador.</CardDescription>
+                <CardDescription>Dados salvos no servidor backend.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2 text-sm">
@@ -585,9 +567,9 @@ export default function DashboardPage() {
                 </div>
                 <Separator />
                 <div className="grid gap-2 text-sm text-muted-foreground">
-                  <p>Último salvamento: {profileSavedAt ? new Date(profileSavedAt).toLocaleString("pt-BR") : "Nenhum"}</p>
                   <p>Reserva sugerida: {currencyFormatter.format(emergencyFund)}</p>
                   <p>Saldo livre mensal: {currencyFormatter.format(monthlySavings)}</p>
+                  <p>Dados sincronizados com o servidor</p>
                 </div>
               </CardContent>
             </Card>
