@@ -7,14 +7,12 @@ import { Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const SESSION_STORAGE_KEY = "finance-app-session";
-
 export default function LogoutPage() {
   const [isCleared, setIsCleared] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    // Session is handled by backend via HTTP-only cookies
+    // No client-side storage to clear
     setIsCleared(true);
   }, []);
 
