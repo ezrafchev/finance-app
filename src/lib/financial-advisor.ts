@@ -28,6 +28,19 @@ export interface Recommendation {
   icon: string;
 }
 
+/**
+ * Calculates comprehensive financial metrics based on user profile and transactions.
+ * 
+ * @param profile - User's financial profile containing income and expense information
+ * @param transactions - Array of financial transactions (income and expenses)
+ * @returns Object containing calculated financial metrics including:
+ *   - totalIncome: Sum of all income transactions
+ *   - totalExpenses: Sum of all expense transactions
+ *   - balance: Net difference between income and expenses
+ *   - savingsRate: Percentage of monthly income being saved
+ *   - monthlyFreeCashFlow: Available cash after monthly expenses
+ *   - emergencyFundTarget: Recommended emergency fund (6 months of expenses)
+ */
 function calculateMetrics(profile: Profile, transactions: Transaction[]) {
   const monthlyIncome = profile.monthlyIncome || 0;
   const fixedExpenses = profile.fixedExpenses || 0;

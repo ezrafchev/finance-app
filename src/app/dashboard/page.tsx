@@ -77,6 +77,8 @@ const parseLocalDate = (value: string) => {
   return new Date(year, month - 1, day);
 };
 
+const NUMERIC_PROFILE_FIELDS = ['monthlyIncome', 'fixedExpenses', 'variableExpenses'] as const;
+
 const parseNumber = (value: string) => {
   const normalized = value.replace(",", ".");
   return Number.isNaN(Number.parseFloat(normalized)) ? 0 : Number.parseFloat(normalized);
@@ -214,7 +216,7 @@ export default function DashboardPage() {
     const value = event.target.value;
     setProfile((prev) => ({
       ...prev,
-      [field]: field === 'monthlyIncome' || field === 'fixedExpenses' || field === 'variableExpenses'
+      [field]: (NUMERIC_PROFILE_FIELDS as readonly string[]).includes(field)
         ? parseNumber(value)
         : value
     }));
@@ -508,17 +510,17 @@ export default function DashboardPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="income">Renda mensal (R$)</Label>
-                      <Input id="income" inputMode="decimal" value={profile.monthlyIncome || ''} onChange={handleProfileChange("monthlyIncome")} placeholder="5000" />
+                      <Input id="income" inputMode="decimal" value={profile.monthlyIncome ?? ''} onChange={handleProfileChange("monthlyIncome")} placeholder="5000" />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="fixed">Despesas fixas (R$)</Label>
-                      <Input id="fixed" inputMode="decimal" value={profile.fixedExpenses || ''} onChange={handleProfileChange("fixedExpenses")} placeholder="2500" />
+                      <Input id="fixed" inputMode="decimal" value={profile.fixedExpenses ?? ''} onChange={handleProfileChange("fixedExpenses")} placeholder="2500" />
                     </div>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="variable">Despesas variáveis (R$)</Label>
-                      <Input id="variable" inputMode="decimal" value={profile.variableExpenses || ''} onChange={handleProfileChange("variableExpenses")} placeholder="1200" />
+                      <Input id="variable" inputMode="decimal" value={profile.variableExpenses ?? ''} onChange={handleProfileChange("variableExpenses")} placeholder="1200" />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="risk">Perfil de risco</Label>
