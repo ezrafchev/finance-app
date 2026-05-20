@@ -179,7 +179,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
         <div className="container mx-auto px-4 py-8 text-center text-muted-foreground">
-          <p>© {new Date().getFullYear()} Finance App. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} Finance App. Todos os direitos reservados. Criado por ezrafchev.</p>
           <p className="mt-2">
             <Link href="/privacy" className="underline underline-offset-4">Política de privacidade</Link>
           </p>
